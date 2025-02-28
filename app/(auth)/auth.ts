@@ -62,17 +62,7 @@ export const {
     }),
   ],
   // Add proxy configuration for Docker environment
-  cookies: {
-    sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production'
-      },
-    },
-  },
+  cookies: undefined,
   trustHost: true,
   callbacks: {
     async jwt({ token, user }) {
@@ -89,19 +79,12 @@ export const {
 
       return token;
     },
-    async session({
-      session,
-      token,
-    }: {
+    async session({ session, token,}: {
       session: ExtendedSession;
       token: any;
-    }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.email = token.email as string;
-      }
-
-      return session;
+    })
+     {
+      return {} as any;
     },
   },
 });

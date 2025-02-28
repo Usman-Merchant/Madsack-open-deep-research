@@ -22,7 +22,7 @@ services:
       - .env
     environment:
       <<: [*postgres-config, *redis-config, *minio-config]
-      NEXTAUTH_URL: http://app:3000
+      NEXTAUTH_URL: http://35.246.170.122:3000
       NEXTAUTH_SECRET: ${AUTH_SECRET}
       # Required for Docker setup
       NEXTAUTH_URL_INTERNAL: http://app:3000
