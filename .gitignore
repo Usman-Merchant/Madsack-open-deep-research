@@ -28,11 +28,11 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
-
+.env_bkp_07-03-25
 # turbo
 .turbo
 
-.env
+.env*
 .vercel
 .vscode
 .env*.local
