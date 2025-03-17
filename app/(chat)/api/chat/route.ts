@@ -387,7 +387,7 @@ export async function POST(request: Request) {
                   const timeRemaining = timeLimit - timeElapsed;
                   const timeRemainingMinutes =
                     Math.round((timeRemaining / 1000 / 60) * 10) / 10;
-
+              
                   // Reasoning model
                   const result = await generateText({
                     model: customModel(reasoningModel.apiIdentifier, true),
@@ -402,29 +402,76 @@ export async function POST(request: Request) {
                             Important: If less than 1 minute remains, set shouldContinue to false to allow time for final synthesis.
                             If I have enough information, set shouldContinue to false.
                             
-                            Respond in this exact JSON format:
+                            You MUST respond in this exact JSON format without ANY additional text or explanations outside the JSON:
                             {
                               "analysis": {
                                 "summary": "summary of findings",
                                 "gaps": ["gap1", "gap2"],
                                 "nextSteps": ["step1", "step2"],
-                                "shouldContinue": true/false,
+                                "shouldContinue": true,
                                 "nextSearchTopic": "optional topic",
                                 "urlToSearch": "optional url"
                               }
                             }`,
                   });
-
+              
                   try {
-                    const parsed = JSON.parse(result.text);
-                    return parsed.analysis;
+                    // Try to extract JSON if it's wrapped in code blocks or has surrounding text
+                    let jsonText = result.text;
+                    
+                    // Extract JSON if wrapped in ```json ... ``` or ``` ... ```
+                    const codeBlockMatch = jsonText.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
+                    if (codeBlockMatch && codeBlockMatch[1]) {
+                      jsonText = codeBlockMatch[1];
+                    }
+                    
+                    // Try to find JSON object pattern if there's text around it
+                    const jsonObjectMatch = jsonText.match(/{[\s\S]*"analysis"[\s\S]*}/);
+                    if (jsonObjectMatch) {
+                      jsonText = jsonObjectMatch[0];
+                    }
+              
+                    try {
+                      const parsed = JSON.parse(jsonText);
+                      return parsed.analysis;
+                    } catch (innerError) {
+                      console.error('Failed to parse cleaned JSON response:', innerError);
+                      
+                      // Fallback: create a minimal valid response to continue the process
+                      return {
+                        summary: "Failed to parse model response. Continuing research.",
+                        gaps: ["Additional information needed"],
+                        nextSteps: ["Search for more information"],
+                        shouldContinue: true,
+                        nextSearchTopic: topic,
+                        urlToSearch: ""
+                      };
+                    }
                   } catch (error) {
                     console.error('Failed to parse JSON response:', error);
-                    return null;
+                    
+                    // Fallback: create a minimal valid response to continue the process
+                    return {
+                      summary: "Failed to parse model response. Continuing research.",
+                      gaps: ["Additional information needed"],
+                      nextSteps: ["Search for more information"],
+                      shouldContinue: true,
+                      nextSearchTopic: topic,
+                      urlToSearch: ""
+                    };
                   }
                 } catch (error) {
                   console.error('Analysis error:', error);
-                  return null;
+                  
+                  // Fallback: create a minimal valid response to continue the process
+                  return {
+                    summary: "Error during analysis. Continuing research.",
+                    gaps: ["Additional information needed"],
+                    nextSteps: ["Search for more information"],
+                    shouldContinue: true,
+                    nextSearchTopic: topic,
+                    urlToSearch: ""
+                  };
                 }
               };
 

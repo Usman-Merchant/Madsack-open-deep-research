@@ -1,8 +1,8 @@
 x-postgres-config: &postgres-config
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
-  POSTGRES_DB: open_deep_research
-  POSTGRES_URL: postgresql://postgres:postgres@postgres:5432/open_deep_research
+  POSTGRES_DB: postgres
+  POSTGRES_URL: postgresql://postgres:postgres@postgres:5432/postgres
 
 x-redis-config: &redis-config
   UPSTASH_REDIS_REST_URL: http://redis:6379
