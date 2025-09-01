@@ -1,75 +1,115 @@
-import { experimental_wrapLanguageModel as wrapLanguageModel } from "ai";
-import { deepseek } from "@ai-sdk/deepseek";
+import { openai } from '@ai-sdk/openai';
+import { openrouter } from '@openrouter/ai-sdk-provider';
+import { deepseek } from '@ai-sdk/deepseek';
+import { experimental_wrapLanguageModel as wrapLanguageModel } from 'ai';
 import { customMiddleware } from "./custom-middleware";
-// Type definition for valid reasoning models used for research and structured outputs
-type ReasoningModel = (typeof VALID_REASONING_MODELS)[number];
-// Valid reasoning models that can be used for research analysis and structured outputs
+
+type ReasoningModel = typeof VALID_REASONING_MODELS[number];
+
+// Reasoning models that require deep thinking/structured outputs
 const VALID_REASONING_MODELS = [
-  "deepseek-reasoner"
+  'o1',
+  'o1-mini',
+  'o3-mini',
+  'deepseek-reasoner',
+  'gpt-4o'
 ] as const;
-// Models that support JSON structured output
+
+// Models that support JSON outputs
 const JSON_SUPPORTED_MODELS = [
-  "deepseek-chat"
+  'gpt-4o',
+  'gpt-4o-mini',
+  'deepseek-chat'
 ] as const;
-// Helper to check if model supports JSON
+
 export const supportsJsonOutput = (modelId: string) =>
-  JSON_SUPPORTED_MODELS.includes(modelId as (typeof JSON_SUPPORTED_MODELS)[number]);
-// Get reasoning model from env, with JSON support info
-const REASONING_MODEL = process.env.REASONING_MODEL || "deepseek-reasoner";
-const BYPASS_JSON_VALIDATION = process.env.BYPASS_JSON_VALIDATION === "true";
-// Helper to get the reasoning model based on user's selected model
+  JSON_SUPPORTED_MODELS.includes(modelId as typeof JSON_SUPPORTED_MODELS[number]);
+
+const REASONING_MODEL = process.env.REASONING_MODEL || 'o1-mini';
+const BYPASS_JSON_VALIDATION = process.env.BYPASS_JSON_VALIDATION === 'true';
+
 function getReasoningModel(modelId: string) {
-  // If already using a valid reasoning model, keep using it
   if (VALID_REASONING_MODELS.includes(modelId as ReasoningModel)) {
     return modelId;
   }
+
   const configuredModel = REASONING_MODEL;
+
   if (!VALID_REASONING_MODELS.includes(configuredModel as ReasoningModel)) {
-    const fallback = "deepseek-reasoner";
-    console.warn(
-      `Invalid REASONING_MODEL "${configuredModel}", falling back to ${fallback}`,
-    );
+    const fallback = 'o1-mini';
+    console.warn(`Invalid REASONING_MODEL "${configuredModel}", falling back to ${fallback}`);
     return fallback;
   }
-  // Warn if trying to use JSON with unsupported model
+
   if (!BYPASS_JSON_VALIDATION && !supportsJsonOutput(configuredModel)) {
-    console.warn(
-      `Warning: Model ${configuredModel} does not support JSON schema. Set BYPASS_JSON_VALIDATION=true to override`,
-    );
+    console.warn(`Warning: Model ${configuredModel} does not support JSON schema. Set BYPASS_JSON_VALIDATION=true to override`);
   }
+
   return configuredModel;
 }
-export const customModel = (
-  apiIdentifier: string,
-  forReasoning: boolean = false,
-) => {
-  // For reasoning, get the appropriate reasoning model
+
+export const customModel = (apiIdentifier: string, forReasoning: boolean = false) => {
+  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY !== '****';
+  const hasOpenAIKey = !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== '****';
+
   const modelId = forReasoning ? getReasoningModel(apiIdentifier) : apiIdentifier;
-  // Handle DeepSeek model selection
-  if (modelId === "deepseek-reasoner") {
-    console.log("Using model: deepseek-reasoner with DeepSeek provider");
+
+  // ===== DeepSeek Models =====
+  if (modelId === 'deepseek-reasoner') {
+    console.log('Using DeepSeek Reasoner');
     return wrapLanguageModel({
-      model: deepseek("deepseek-reasoner"),
-      middleware: customMiddleware,
-    });
-  } else if (modelId === "deepseek-chat") {
-    console.log("Using model: deepseek-chat with DeepSeek provider");
-    return wrapLanguageModel({
-      model: deepseek("deepseek-chat"),
-      middleware: customMiddleware,
-    });
-  } else if (modelId === "deepseek-coder") {
-    console.log("Using model: deepseek-coder with DeepSeek provider");
-    return wrapLanguageModel({
-      model: deepseek("deepseek-coder"),
-      middleware: customMiddleware,
-    });
-  } else {
-    // Default to DeepSeek Chat
-    console.log("Unknown model requested:", modelId, "falling back to deepseek-chat");
-    return wrapLanguageModel({
-      model: deepseek("deepseek-chat"),
+      model: deepseek('deepseek-reasoner'),
       middleware: customMiddleware,
     });
   }
+
+  if (modelId === 'deepseek-chat') {
+    console.log('Using DeepSeek Chat');
+    return wrapLanguageModel({
+      model: deepseek('deepseek-chat'),
+      middleware: customMiddleware,
+    });
+  }
+
+  if (modelId === 'deepseek-coder') {
+    console.log('Using DeepSeek Coder');
+    return wrapLanguageModel({
+      model: deepseek('deepseek-coder'),
+      middleware: customMiddleware,
+    });
+  }
+
+  // ===== OpenRouter Models =====
+  if (['o1', 'o1-mini', 'o3-mini'].includes(modelId)) {
+    if (!hasOpenRouterKey) {
+      throw new Error('OpenRouter API key is missing, required for model: ' + modelId);
+    }
+
+    console.log(`Using OpenRouter model: ${modelId}`);
+    return wrapLanguageModel({
+      model: openrouter(modelId),
+      middleware: customMiddleware,
+    });
+  }
+
+  // ===== OpenAI Models =====
+  if (['gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
+    if (!hasOpenAIKey) {
+      throw new Error('OpenAI API key is missing, required for model: ' + modelId);
+    }
+
+    console.log(`Using OpenAI model: ${modelId}`);
+    return wrapLanguageModel({
+      model: openai(modelId),
+      middleware: customMiddleware,
+    });
+  }
+
+  // ===== Fallback =====
+  console.warn(`Unknown model requested: ${modelId}, defaulting to deepseek-chat`);
+  return wrapLanguageModel({
+    model: deepseek('deepseek-chat'),
+    middleware: customMiddleware,
+  });
 };
+
